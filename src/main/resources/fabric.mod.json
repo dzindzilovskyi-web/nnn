@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 1,
+  "id": "dropall",
+  "version": "1.0.2",
+  "name": "Drop All Button",
+  "description": "Drop all and Take all buttons for inventory and containers.",
+  "environment": "client",
+  "entrypoints": { "client": ["com.example.dropall.DropAllMod"] },
+  "mixins": ["dropall.mixins.json"],
+  "depends": {
+    "fabricloader": ">=0.16.0",
+    "minecraft": "1.21.11",
+    "java": ">=21"
+  }
+}
