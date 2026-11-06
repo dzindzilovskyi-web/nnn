@@ -30,7 +30,7 @@ public abstract class HandledScreenMixin<T extends ScreenHandler> extends Screen
 
     // Раскладка: ряд кнопок над окном, по центру окна.
     // Порядок слева направо: Выкинуть всё | Сложить всё | Сортировать | Забрать всё
-    // Между «Сложить» и «Сортировать» находится центр окна (Сложить чуть левее центра).
+    // Между «Сложить» и «Сортировать» находится центр окна. В инвентаре игрока только «Выкинуть» и «Сортировать».
     private static final int BTN_W = 72;
     private static final int BTN_H = 20;
     private static final int GAP = 2;
@@ -58,21 +58,20 @@ public abstract class HandledScreenMixin<T extends ScreenHandler> extends Screen
 
         dropall$dropBtn = ButtonWidget.builder(Text.literal("Выкинуть всё"), b -> dropall$dropAll())
             .dimensions(0, 0, BTN_W, BTN_H).build();
-        dropall$stackBtn = ButtonWidget.builder(Text.literal("Сложить всё"), b -> dropall$stackMyInventory())
-            .dimensions(0, 0, BTN_W, BTN_H).build();
         dropall$sortBtn = ButtonWidget.builder(Text.literal("Сортировать"), b -> dropall$sortOpened())
             .dimensions(0, 0, BTN_W, BTN_H).build();
-
         this.addDrawableChild(dropall$dropBtn);
-        this.addDrawableChild(dropall$stackBtn);
-        this.addDrawableChild(dropall$sortBtn);
 
-        // «Забрать всё» только там, где есть контейнер
+        // «Сложить всё» и «Забрать всё» только там, где есть контейнер
         if (!(handler instanceof PlayerScreenHandler)) {
+            dropall$stackBtn = ButtonWidget.builder(Text.literal("Сложить всё"), b -> dropall$putAll())
+                .dimensions(0, 0, BTN_W, BTN_H).build();
             dropall$takeBtn = ButtonWidget.builder(Text.literal("Забрать всё"), b -> dropall$takeAll())
                 .dimensions(0, 0, BTN_W, BTN_H).build();
-            this.addDrawableChild(dropall$takeBtn);
+            this.addDrawableChild(dropall$stackBtn);
         }
+        this.addDrawableChild(dropall$sortBtn);
+        if (dropall$takeBtn != null) this.addDrawableChild(dropall$takeBtn);
         dropall$layout();
     }
 
@@ -85,16 +84,20 @@ public abstract class HandledScreenMixin<T extends ScreenHandler> extends Screen
     @Unique
     private void dropall$layout() {
         if (dropall$dropBtn == null) return;
-        int step = BTN_W + GAP;
-        int total = 4 * BTN_W + 3 * GAP;
+        ButtonWidget[] order = { dropall$dropBtn, dropall$stackBtn, dropall$sortBtn, dropall$takeBtn };
+        int n = 0;
+        for (ButtonWidget b : order) if (b != null) n++;
+
+        int total = n * BTN_W + (n - 1) * GAP;
         int center = this.x + this.backgroundWidth / 2;
-        int start = center - total / 2;
+        int cx = center - total / 2;
         int by = Math.max(2, this.y - OFFSET_ABOVE);
 
-        dropall$dropBtn.setPosition(start, by);
-        dropall$stackBtn.setPosition(start + step, by);
-        dropall$sortBtn.setPosition(start + 2 * step, by);
-        if (dropall$takeBtn != null) dropall$takeBtn.setPosition(start + 3 * step, by);
+        for (ButtonWidget b : order) {
+            if (b == null) continue;
+            b.setPosition(cx, by);
+            cx += BTN_W + GAP;
+        }
     }
 
     @Unique
@@ -172,14 +175,16 @@ public abstract class HandledScreenMixin<T extends ScreenHandler> extends Screen
         }
     }
 
-    // ---------- Сложить всё (ваш инвентарь без хотбара) ----------
+    // ---------- Сложить всё (из вашего инвентаря в контейнер, без хотбара) ----------
 
     @Unique
-    private void dropall$stackMyInventory() {
+    private void dropall$putAll() {
         MinecraftClient mc = MinecraftClient.getInstance();
         if (mc.player == null || mc.interactionManager == null) return;
-        if (!handler.getCursorStack().isEmpty()) return;
-        dropall$merge(mc, dropall$mainInventorySlots());
+        for (Slot slot : dropall$mainInventorySlots()) {
+            if (!slot.hasStack()) continue;
+            mc.interactionManager.clickSlot(handler.syncId, slot.id, 0, SlotActionType.QUICK_MOVE, mc.player);
+        }
     }
 
     // ---------- Сортировать (открытое меню; в инвентаре игрока - основной инвентарь) ----------
