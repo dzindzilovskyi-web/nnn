@@ -87,9 +87,12 @@ public abstract class HandledScreenMixin<T extends ScreenHandler> extends Screen
     private void dropall$layout() {
         if (dropall$dropBtn == null) return;
         if (handler instanceof PlayerScreenHandler) {
-            int py = Math.max(2, this.y - OFFSET_ABOVE);
-            dropall$dropBtn.setPosition(this.x, py);
-            dropall$takeBtn.setPosition(this.x + this.backgroundWidth - BTN_W, py);
+            // по бокам от окна, на уровне его верхнего края
+            int side = 6;
+            int left = Math.max(2, this.x - BTN_W - side);
+            int right = Math.min(this.width - BTN_W - 2, this.x + this.backgroundWidth + side);
+            dropall$dropBtn.setPosition(left, this.y);
+            dropall$takeBtn.setPosition(right, this.y);
             return;
         }
         ButtonWidget[] order = { dropall$dropBtn, dropall$stackBtn, dropall$sortBtn, dropall$takeBtn };
