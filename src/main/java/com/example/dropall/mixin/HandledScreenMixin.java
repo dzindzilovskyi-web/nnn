@@ -11,6 +11,7 @@ import net.minecraft.screen.*;
 import net.minecraft.screen.slot.Slot;
 import net.minecraft.screen.slot.SlotActionType;
 import net.minecraft.text.Text;
+import org.lwjgl.glfw.GLFW;
 import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
@@ -57,6 +58,13 @@ public abstract class HandledScreenMixin<T extends ScreenHandler> extends Screen
         );
     }
 
+    private static boolean dropall$shiftDown() {
+        long window = GLFW.glfwGetCurrentContext();
+        if (window == 0L) return false;
+        return GLFW.glfwGetKey(window, GLFW.GLFW_KEY_LEFT_SHIFT) == GLFW.GLFW_PRESS
+            || GLFW.glfwGetKey(window, GLFW.GLFW_KEY_RIGHT_SHIFT) == GLFW.GLFW_PRESS;
+    }
+
     private static boolean dropall$isSupported(ScreenHandler h) {
         return h instanceof PlayerScreenHandler
             || h instanceof GenericContainerScreenHandler   // сундук, большой сундук, эндер-сундук, бочка
@@ -70,7 +78,7 @@ public abstract class HandledScreenMixin<T extends ScreenHandler> extends Screen
     // Контейнер: его собственные слоты. Shift = вместо контейнера работаем с основным инвентарём игрока.
     private List<Slot> dropall$targetSlots() {
         boolean playerScreen = handler instanceof PlayerScreenHandler;
-        boolean usePlayerInv = playerScreen || Screen.hasShiftDown();
+        boolean usePlayerInv = playerScreen || dropall$shiftDown();
 
         List<Slot> result = new ArrayList<>();
         for (Slot slot : handler.slots) {
@@ -92,7 +100,7 @@ public abstract class HandledScreenMixin<T extends ScreenHandler> extends Screen
         if (mc.player == null || mc.interactionManager == null) return;
 
         boolean playerScreen = handler instanceof PlayerScreenHandler;
-        boolean usePlayerInv = playerScreen || Screen.hasShiftDown();
+        boolean usePlayerInv = playerScreen || dropall$shiftDown();
 
         for (Slot slot : handler.slots) {
             if (!slot.hasStack()) continue;
