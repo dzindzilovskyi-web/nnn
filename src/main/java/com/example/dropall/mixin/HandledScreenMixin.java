@@ -56,22 +56,24 @@ public abstract class HandledScreenMixin<T extends ScreenHandler> extends Screen
         if ((Object) this instanceof CreativeInventoryScreen) return;
         if (!dropall$isSupported(handler)) return;
 
+        boolean playerScreen = handler instanceof PlayerScreenHandler;
+
         dropall$dropBtn = ButtonWidget.builder(Text.literal("Выкинуть всё"), b -> dropall$dropAll())
             .dimensions(0, 0, BTN_W, BTN_H).build();
-        dropall$sortBtn = ButtonWidget.builder(Text.literal("Сортировать"), b -> dropall$sortOpened())
+        dropall$takeBtn = ButtonWidget.builder(Text.literal("Забрать всё"), b -> dropall$takeAll())
             .dimensions(0, 0, BTN_W, BTN_H).build();
         this.addDrawableChild(dropall$dropBtn);
 
-        // «Сложить всё» и «Забрать всё» только там, где есть контейнер
-        if (!(handler instanceof PlayerScreenHandler)) {
+        // «Сложить всё» и «Сортировать» только там, где есть контейнер
+        if (!playerScreen) {
             dropall$stackBtn = ButtonWidget.builder(Text.literal("Сложить всё"), b -> dropall$putAll())
                 .dimensions(0, 0, BTN_W, BTN_H).build();
-            dropall$takeBtn = ButtonWidget.builder(Text.literal("Забрать всё"), b -> dropall$takeAll())
+            dropall$sortBtn = ButtonWidget.builder(Text.literal("Сортировать"), b -> dropall$sortOpened())
                 .dimensions(0, 0, BTN_W, BTN_H).build();
             this.addDrawableChild(dropall$stackBtn);
+            this.addDrawableChild(dropall$sortBtn);
         }
-        this.addDrawableChild(dropall$sortBtn);
-        if (dropall$takeBtn != null) this.addDrawableChild(dropall$takeBtn);
+        this.addDrawableChild(dropall$takeBtn);
         dropall$layout();
     }
 
@@ -84,6 +86,12 @@ public abstract class HandledScreenMixin<T extends ScreenHandler> extends Screen
     @Unique
     private void dropall$layout() {
         if (dropall$dropBtn == null) return;
+        if (handler instanceof PlayerScreenHandler) {
+            int py = Math.max(2, this.y - OFFSET_ABOVE);
+            dropall$dropBtn.setPosition(this.x, py);
+            dropall$takeBtn.setPosition(this.x + this.backgroundWidth - BTN_W, py);
+            return;
+        }
         ButtonWidget[] order = { dropall$dropBtn, dropall$stackBtn, dropall$sortBtn, dropall$takeBtn };
         int n = 0;
         for (ButtonWidget b : order) if (b != null) n++;
@@ -169,6 +177,17 @@ public abstract class HandledScreenMixin<T extends ScreenHandler> extends Screen
     private void dropall$takeAll() {
         MinecraftClient mc = MinecraftClient.getInstance();
         if (mc.player == null || mc.interactionManager == null) return;
+
+        if (handler instanceof PlayerScreenHandler) {
+            // инвентарь игрока: возвращаем предметы из сетки крафта 2x2 (слот 0 - результат, не трогаем)
+            for (Slot slot : handler.slots) {
+                if (slot.id < 1 || slot.id > 4) continue;
+                if (!slot.hasStack()) continue;
+                mc.interactionManager.clickSlot(handler.syncId, slot.id, 0, SlotActionType.QUICK_MOVE, mc.player);
+            }
+            return;
+        }
+
         for (Slot slot : dropall$containerSlots()) {
             if (!slot.hasStack()) continue;
             mc.interactionManager.clickSlot(handler.syncId, slot.id, 0, SlotActionType.QUICK_MOVE, mc.player);
