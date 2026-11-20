@@ -7,7 +7,6 @@ import net.minecraft.registry.Registries;
 import net.minecraft.screen.*;
 import net.minecraft.screen.slot.Slot;
 import net.minecraft.screen.slot.SlotActionType;
-import org.lwjgl.glfw.GLFW;
 
 import java.util.Arrays;
 import java.util.HashSet;
@@ -17,8 +16,10 @@ import java.util.Set;
 public final class JunkDrop {
     private JunkDrop() {}
 
-    // true = выкидывать мусор и из хотбара тоже
-    private static final boolean INCLUDE_HOTBAR = false;
+    // откуда выкидывать (true = да)
+    private static final boolean INCLUDE_CONTAINER = true; // открытый сундук, шалкер и т.д.
+    private static final boolean INCLUDE_MAIN = true;      // основной инвентарь
+    private static final boolean INCLUDE_HOTBAR = true;    // хотбар
 
     // точные названия предметов (id без minecraft:)
     private static final Set<String> IDS = new HashSet<>(Arrays.asList(
@@ -31,7 +32,14 @@ public final class JunkDrop {
         "beef", "porkchop", "chicken", "mutton", "rabbit",
         "cooked_beef", "cooked_porkchop", "cooked_chicken", "cooked_mutton", "cooked_rabbit",
         "nautilus_shell", "heart_of_the_sea", "dragon_breath", "echo_shard",
-        "spider_eye", "rotten_flesh", "bone", "slime_ball", "gunpowder"
+        "spider_eye", "rotten_flesh", "bone", "slime_ball", "gunpowder",
+        // новые
+        "bone_meal", "anvil", "chipped_anvil", "damaged_anvil", "fermented_spider_eye",
+        "gold_ingot", "dirt", "rail", "powered_rail", "detector_rail", "activator_rail",
+        "shears", "chest", "flint_and_steel", "wheat_seeds", "soul_sand", "string",
+        "bucket", "gold_nugget", "dandelion", "poppy", "target", "slime_block",
+        "conduit", "cobbled_deepslate", "deepslate", "book", "hopper", "brewing_stand",
+        "raw_iron", "copper_ingot", "arrow"
     ));
 
     // все виды: отделки, конская броня, лопаты, топоры, яйца призыва
@@ -45,6 +53,8 @@ public final class JunkDrop {
         "мучительная стрела", "стрела терапии", "стрела обледенения",
         "стрела зевса", "световая стрела", "кровавая стрела"
     };
+    // зелья по названию (обычное, взрывное, задерживающееся)
+    private static final String[] POTION_NAMES = { "хлопушк" };
 
     public static boolean isSupported(ScreenHandler h) {
         return h instanceof PlayerScreenHandler
@@ -54,11 +64,9 @@ public final class JunkDrop {
             || h instanceof Generic3x3ContainerScreenHandler;
     }
 
-    private static boolean shiftDown() {
-        long window = GLFW.glfwGetCurrentContext();
-        if (window == 0L) return false;
-        return GLFW.glfwGetKey(window, GLFW.GLFW_KEY_LEFT_SHIFT) == GLFW.GLFW_PRESS
-            || GLFW.glfwGetKey(window, GLFW.GLFW_KEY_RIGHT_SHIFT) == GLFW.GLFW_PRESS;
+    private static String nameOf(ItemStack stack) {
+        return stack.getName().getString()
+            .replaceAll("§.", "").replace('ё', 'е').toLowerCase(Locale.ROOT);
     }
 
     private static boolean isJunk(ItemStack stack) {
@@ -70,32 +78,34 @@ public final class JunkDrop {
         for (String p : PREFIXES) if (path.startsWith(p)) return true;
 
         if (path.equals("tipped_arrow")) {
-            String name = stack.getName().getString()
-                .replaceAll("§.", "").replace('ё', 'е').toLowerCase(Locale.ROOT);
+            String name = nameOf(stack);
             for (String a : ARROW_NAMES) if (name.contains(a)) return true;
+        }
+        if (path.endsWith("potion")) {
+            String name = nameOf(stack);
+            for (String p : POTION_NAMES) if (name.contains(p)) return true;
         }
         return false;
     }
 
-    // Обычное нажатие: выкидывает мусор из вашего основного инвентаря (без хотбара).
-    // С зажатым Shift в сундуке и т.п.: выкидывает мусор из самого контейнера.
+    // Выкидывает мусор из открытого контейнера, основного инвентаря и хотбара.
+    // Броня, щит и сетка крафта не трогаются.
     public static void run(ScreenHandler handler) {
         MinecraftClient mc = MinecraftClient.getInstance();
         if (mc.player == null || mc.interactionManager == null) return;
 
-        boolean fromContainer = !(handler instanceof PlayerScreenHandler) && shiftDown();
+        boolean containerOpen = !(handler instanceof PlayerScreenHandler);
 
         for (Slot slot : handler.slots) {
             if (!isJunk(slot.getStack())) continue;
-            boolean isPlayerInv = slot.inventory instanceof PlayerInventory;
 
-            if (fromContainer) {
-                if (isPlayerInv) continue;
-            } else {
-                if (!isPlayerInv) continue;
+            if (slot.inventory instanceof PlayerInventory) {
                 int idx = slot.getIndex();
-                int min = INCLUDE_HOTBAR ? 0 : 9;
-                if (idx < min || idx > 35) continue;
+                if (idx < 0 || idx > 35) continue;
+                if (idx < 9 && !INCLUDE_HOTBAR) continue;
+                if (idx >= 9 && !INCLUDE_MAIN) continue;
+            } else {
+                if (!containerOpen || !INCLUDE_CONTAINER) continue;
             }
             mc.interactionManager.clickSlot(handler.syncId, slot.id, 1, SlotActionType.THROW, mc.player);
         }
